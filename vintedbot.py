@@ -1,58 +1,62 @@
-import os, sqlite3, asyncio
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
+import asyncio
+import os
 
-TOKEN        = os.environ["DISCORD_TOKEN"]
-CATEGORY_ID  = int(os.environ["DISCORD_CATEGORY_ID"])  # put your category ID here
+TOKEN = os.getenv("DISCORD_TOKEN")  # get token from Render env
+CATEGORY_ID = int(os.getenv("DISCORD_CATEGORY_ID", "0"))  # put your category ID in Render env
 
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# Database setup
-conn = sqlite3.connect("subscriptions.db")
-cur = conn.cursor()
-cur.execute("CREATE TABLE IF NOT EXISTS subs (channel_id INTEGER, url TEXT)")
-conn.commit()
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()  # sync slash commands
-    print(f"✅ Logged in as {bot.user}")
-
-# /vinted command
-@bot.tree.command(name="vinted", description="Create a Vinted watcher channel")
-@app_commands.describe(url="The Vinted search URL with filters", channel_name="Name of the new channel")
-async def vinted(interaction: discord.Interaction, url: str, channel_name: str):
-    category = discord.utils.get(interaction.guild.categories, id=CATEGORY_ID)
-    if not category:
-        await interaction.response.send_message("❌ Category not found.", ephemeral=True)
-        return
-
-    # Create the channel
-    channel = await interaction.guild.create_text_channel(channel_name, category=category)
-
-    # Save mapping
-    cur.execute("INSERT INTO subs (channel_id, url) VALUES (?, ?)", (channel.id, url))
-    conn.commit()
-
-    await interaction.response.send_message(f"✅ Created {channel.mention} for {url}")
-
-# Example polling loop (placeholder)
+# --- background loop (replace with real Vinted API later) ---
 async def poll_loop():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        cur.execute("SELECT channel_id, url FROM subs")
-        for channel_id, url in cur.fetchall():
-            channel = bot.get_channel(channel_id)
-            if channel:
-                # TODO: replace with actual fetching (email/RSS)
-                await channel.send(f"(Checking for new items for: {url})")
-        await asyncio.sleep(60)
+    await asyncio.sleep(5)  # wait until bot ready
+    while True:
+        print("🔎 Checking Vinted...")
+        # TODO: fetch listings & send messages
+        await asyncio.sleep(60)  # check every 60s
 
+
+# --- custom bot class with setup_hook ---
 class MyBot(commands.Bot):
     async def setup_hook(self):
+        # start background task
         self.loop.create_task(poll_loop())
+        # sync slash commands
+        await self.tree.sync()
 
-bot = MyBot(command_prefix="/", intents=discord.Intents.all())
+intents = discord.Intents.default()
+intents.guilds = True
+intents.messages = True
+
+bot = MyBot(command_prefix="!", intents=intents)
+
+
+# --- events ---
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
+
+
+# --- slash command: /add ---
+@bot.tree.command(name="add", description="Create a Vinted channel from a link")
+@app_commands.describe(vinted_link="Paste your Vinted link with filters", channel_name="Name for the channel")
+async def add_channel(interaction: discord.Interaction, vinted_link: str, channel_name: str):
+
+    guild = interaction.guild
+    category = discord.utils.get(guild.categories, id=CATEGORY_ID)
+
+    if not category:
+        await interaction.response.send_message("❌ Category not found. Check DISCORD_CATEGORY_ID.", ephemeral=True)
+        return
+
+    # create channel
+    channel = await guild.create_text_channel(name=channel_name, category=category)
+
+    # send first message with link
+    await channel.send(f"🔗 Vinted link: {vinted_link}")
+
+    await interaction.response.send_message(f"✅ Created channel <#{channel.id}> for {vinted_link}")
+
+
+# --- run bot ---
 bot.run(TOKEN)
