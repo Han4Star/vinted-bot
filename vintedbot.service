@@ -1,0 +1,14 @@
+[Unit]
+Description=Vinted Discord Bot
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/vinted-bot
+ExecStart=/usr/bin/python3 /home/ubuntu/vinted-bot/vintedbot.py
+Environment="DISCORD_TOKEN=your_token_here"
+Environment="DISCORD_CATEGORY_ID=123456789012345678"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
