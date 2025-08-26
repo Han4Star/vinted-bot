@@ -22,7 +22,17 @@ class MyBot(commands.Bot):
         # start background task
         self.loop.create_task(poll_loop())
         # sync slash commands
-        await self.tree.sync()
+        GUILD_ID = int(os.getenv("1410012215121023008", "0"))
+
+class MyBot(commands.Bot):
+    async def setup_hook(self):
+        self.loop.create_task(poll_loop())
+        if GUILD_ID:
+            guild = discord.Object(id=GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)  # instant sync
+        else:
+            await self.tree.sync()  # fallback
 
 intents = discord.Intents.default()
 intents.guilds = True
