@@ -50,5 +50,9 @@ async def poll_loop():
                 await channel.send(f"(Checking for new items for: {url})")
         await asyncio.sleep(60)
 
-bot.loop.create_task(poll_loop())
+class MyBot(commands.Bot):
+    async def setup_hook(self):
+        self.loop.create_task(poll_loop())
+
+bot = MyBot(command_prefix="/", intents=discord.Intents.all())
 bot.run(TOKEN)
